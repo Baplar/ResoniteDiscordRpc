@@ -48,6 +48,7 @@ namespace FrooxEngine.Interfacing {
             }
             discord.UpdateLargeAsset(LARGE_IMAGE_ID);
             discord.UpdateType(ActivityType.Playing);
+            discord.UpdateStatusDisplayType(StatusDisplayType.Name);
             Initialized = true;
             ShouldUpdate = true;
             UniLog.Log("Discord connector initialized.");
@@ -75,7 +76,6 @@ namespace FrooxEngine.Interfacing {
                     discord.Update(presence => {
                         presence.Timestamps = new(world.Time.LocalSessionBeginTime);
                         presence.State = world.GetLocalized("Discord.RichPresence.InPrivateWorld");
-                        presence.StatusDisplay = StatusDisplayType.State;
                         presence.StateUrl = null;
                         presence.Assets = new() {
                             LargeImageKey = LARGE_IMAGE_ID,
@@ -90,7 +90,6 @@ namespace FrooxEngine.Interfacing {
                     discord.Update(presence => {
                         presence.Timestamps = new Timestamps(world.Time.LocalSessionBeginTime);
                         presence.State = world.GetLocalized("Discord.RichPresence.InPublicWorld");
-                        presence.StatusDisplay = StatusDisplayType.Details;
                         string goResoniteUrl = Interface.Engine.PlatformProfile.GetSessionWebUri(world.SessionId).ToString();
                         presence.StateUrl = goResoniteUrl;
                         if (world.Time.WorldTime >= 60) {
@@ -138,7 +137,6 @@ namespace FrooxEngine.Interfacing {
                 discord.Update(presence => {
                     presence.Timestamps = null;
                     presence.State = null;
-                    presence.StatusDisplay = StatusDisplayType.Name;
                     presence.StateUrl = null;
                     presence.Assets = new() {
                         LargeImageKey = LARGE_IMAGE_ID,
