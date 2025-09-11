@@ -1,4 +1,4 @@
-# ExampleMod
+# ResoniteDiscordRpc
 
 A [ResoniteModLoader](https://github.com/resonite-modding-group/ResoniteModLoader) mod for [Resonite](https://resonite.com/) that adds fancy features to the Discord Rich Presence integration. Compatible with Windows and Linux.
 
