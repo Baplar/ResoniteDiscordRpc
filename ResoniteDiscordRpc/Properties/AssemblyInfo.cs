@@ -5,5 +5,5 @@
 [assembly: AssemblyDescription("A future-proof way to use Discord Rich Presence")]
 [assembly: AssemblyCompany("Baplar")]
 [assembly: AssemblyCopyright("Copyright © 2025 Baplar")]
-[assembly: AssemblyVersion(ResoniteDiscordRpc.ResoniteDiscordRpc.VERSION_CONSTANT)]
-[assembly: AssemblyFileVersion(ResoniteDiscordRpc.ResoniteDiscordRpc.VERSION_CONSTANT)]
+[assembly: AssemblyVersion(ResoniteDiscordRpc.Mod.VERSION_CONSTANT)]
+[assembly: AssemblyFileVersion(ResoniteDiscordRpc.Mod.VERSION_CONSTANT)]

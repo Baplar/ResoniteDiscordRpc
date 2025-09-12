@@ -7,7 +7,10 @@ using DiscordRPC;
 using DiscordRPC.Logging;
 using DiscordRPC.Message;
 
+using ResoniteDiscordRpc;
+
 using Elements.Core;
+using System.Collections.Generic;
 
 namespace FrooxEngine.Interfacing {
     public class DiscordRpcConnector : IPlatformConnector, IDisposable {
@@ -43,15 +46,22 @@ namespace FrooxEngine.Interfacing {
             discord.Logger = new DiscordRpcLogger();
             discord.OnReady += UserCallback;
             if (!discord.Initialize()) {
-                UniLog.Error("Could not initialize Discord RPC connector");
+                Mod.Error("Could not initialize Discord RPC connector");
+                discord.Dispose();
                 return Task.FromResult(false);
             }
-            discord.UpdateLargeAsset(LARGE_IMAGE_ID);
-            discord.UpdateType(ActivityType.Playing);
-            discord.UpdateStatusDisplayType(StatusDisplayType.Name);
+
+            discord.Update(presence => {
+                presence.Type = ActivityType.Playing;
+                presence.StatusDisplay = StatusDisplayType.Name;
+                presence.Assets = new() {
+                    LargeImageKey = LARGE_IMAGE_ID,
+                };
+            });
+
             Initialized = true;
             ShouldUpdate = true;
-            UniLog.Log("Discord connector initialized.");
+            Mod.Msg("Discord connector initialized.");
             Settings.RegisterValueChanges<DiscordIntegrationSettings>(OnRichPresenceSettingsChanged);
             return Task.FromResult(true);
         }
@@ -73,63 +83,73 @@ namespace FrooxEngine.Interfacing {
         public void SetCurrentStatus(World world, bool isPrivate, int totalWorldCount) {
             if (Initialized && IsRichPresenceEnabled) {
                 if (isPrivate || RichPresencePreference < RichPresenceLevel.Full) {
-                    discord.Update(presence => {
-                        presence.Timestamps = new(world.Time.LocalSessionBeginTime);
-                        presence.State = world.GetLocalized("Discord.RichPresence.InPrivateWorld");
-                        presence.StateUrl = null;
-                        presence.Assets = new() {
-                            LargeImageKey = LARGE_IMAGE_ID,
-                            LargeImageText = world.GetLocalized("Discord.RichPresence.InPrivateLargeText", null, ("version", Engine.CurrentVersion)),
-                        };
-                        presence.Details = null;
-                        presence.DetailsUrl = null;
-                        presence.Party = null;
-                        presence.Buttons = null;
-                    });
+                    discord.Update(presence => SetPrivateActivity(presence, world));
                 } else {
-                    discord.Update(presence => {
-                        presence.Timestamps = new Timestamps(world.Time.LocalSessionBeginTime);
-                        presence.State = world.GetLocalized("Discord.RichPresence.InPublicWorld");
-                        string goResoniteUrl = Interface.Engine.PlatformProfile.GetSessionWebUri(world.SessionId).ToString();
-                        presence.StateUrl = goResoniteUrl;
-                        if (world.Time.WorldTime >= 60) {
-                            presence.Assets = new() {
-                                LargeImageKey = $"{goResoniteUrl}/thumbnail",
-                                LargeImageText = world.GetLocalized("Discord.RichPresence.InPublicLargeText", null, ("version", Engine.CurrentVersion)),
-                                LargeImageUrl = goResoniteUrl,
-                                SmallImageKey = SMALL_IMAGE_ID,
-                            };
-                        } else {
-                            // The thumbnail has probably not had time to be generated yet
-                            presence.Assets = new() {
-                                LargeImageKey = LARGE_IMAGE_ID,
-                                LargeImageText = world.GetLocalized("Discord.RichPresence.InPublicLargeText", null, ("version", Engine.CurrentVersion)),
-                                LargeImageUrl = goResoniteUrl,
-                            };
-                        }
-                        string rawString = StringTokenizer.Tokenize(world.Name).GetRawString();
-                        int publicWorldCount = world.WorldManager.Worlds.Count(w => w.IsPublic && world.MaxUsers > 1 && !world.HideFromListing);
-                        presence.Details = world.GetLocalized("Discord.RichPresence.PublicWorldDetails", null, ("worldName", rawString), ("totalWorlds", publicWorldCount));
-                        presence.DetailsUrl = goResoniteUrl;
-                        presence.Party = new Party() {
-                            ID = world.SessionId,
-                            Privacy = Party.PrivacySetting.Public,
-                            Size = world.UserCount,
-                            Max = world.MaxUsers,
-                        };
-                        presence.Buttons = [
-                            new Button() {
-                                Label = world.GetLocalized("World.Detail.SessionInformationHeader", null),
-                                Url = goResoniteUrl
-                            },
-                            new Button() {
-                                Label = world.GetLocalized("World.Actions.Join", null),
-                                Url = Interface.Engine.PlatformProfile.GetSessionUri(world.SessionId).ToString()
-                            },
-                        ];
-                    });
+                    discord.Update(presence => SetPublicActivity(presence, world));
                 }
             }
+        }
+
+        private void SetPrivateActivity(RichPresence presence, World world) {
+            presence.Timestamps = new Timestamps(world.Time.LocalSessionBeginTime);
+            presence.State = world.GetLocalized("Discord.RichPresence.InPrivateWorld");
+            presence.Assets = new() {
+                LargeImageKey = LARGE_IMAGE_ID,
+            };
+            presence.Details = null;
+            presence.Party = null;
+            presence.Buttons = null;
+        }
+
+        private void SetPublicActivity(RichPresence presence, World world) {
+            string rawString = StringTokenizer.Tokenize(world.Name).GetRawString();
+            presence.Timestamps = new Timestamps(world.Time.LocalSessionBeginTime);
+            presence.State = rawString;
+
+            int publicWorldCount = world.WorldManager.Worlds.Count(w => w.IsPublic && world.MaxUsers > 1 && !world.HideFromListing);
+            presence.Details = world.GetLocalized(
+                "Discord.RichPresence.PublicWorldDetails", null,
+                ("worldName", world.GetLocalized("Discord.RichPresence.InPublicWorld")),
+                ("totalWorlds", publicWorldCount));
+            presence.Party = new Party() {
+                ID = world.SessionId,
+                Privacy = Party.PrivacySetting.Public,
+                Size = world.UserCount,
+                Max = world.MaxUsers,
+            };
+
+            string sessionInfoUrl = Interface.Engine.PlatformProfile.GetSessionWebUri(world.SessionId).ToString();
+
+            if (Mod.Thumbnail && world.Time.LocalWorldTime >= 60) {
+                // The thumbnail takes a while to be initialized
+                presence.Assets = new() {
+                    LargeImageKey = $"{sessionInfoUrl}/thumbnail",
+                    SmallImageKey = SMALL_IMAGE_ID,
+                };
+                if (Mod.SessionInfo) {
+                    presence.Assets.LargeImageUrl = sessionInfoUrl;
+                    presence.Assets.LargeImageText = rawString;
+                }
+            } else {
+                presence.Assets = new() {
+                    LargeImageKey = LARGE_IMAGE_ID,
+                };
+            }
+
+            List<Button> buttons = [];
+            if (Mod.SessionInfo) {
+                buttons.Add(new Button() {
+                    Label = world.GetLocalized("World.Detail.SessionInformationHeader"),
+                    Url = sessionInfoUrl
+                });
+            }
+            if (Mod.Join) {
+                buttons.Add(new Button() {
+                    Label = world.GetLocalized("World.Actions.Join"),
+                    Url = Interface.Engine.PlatformProfile.GetSessionUri(world.SessionId).ToString()
+                });
+            }
+            presence.Buttons = buttons.ToArray();
         }
 
         private void SetBlankActivity() {
@@ -137,12 +157,10 @@ namespace FrooxEngine.Interfacing {
                 discord.Update(presence => {
                     presence.Timestamps = null;
                     presence.State = null;
-                    presence.StateUrl = null;
                     presence.Assets = new() {
                         LargeImageKey = LARGE_IMAGE_ID,
                     };
                     presence.Details = null;
-                    presence.DetailsUrl = null;
                     presence.Party = null;
                     presence.Buttons = null;
                 });
@@ -171,19 +189,19 @@ namespace FrooxEngine.Interfacing {
 
     public class DiscordRpcLogger : ILogger {
         public void Trace(string message, params object[] args) {
-            // Ignore
+            Mod.Debug(String.Format(message, args));
         }
         public void Info(string message, params object[] args) {
-            UniLog.Log(String.Format($"Discord:Info - {message}", args));
+            Mod.Msg(String.Format(message, args));
         }
         public void Warning(string message, params object[] args) {
-            UniLog.Warning(String.Format($"Discord:Warning - {message}", args));
+            Mod.Warn(String.Format(message, args));
         }
         public void Error(string message, params object[] args) {
-            UniLog.Error(String.Format($"Discord:Error - {message}", args));
+            Mod.Error(String.Format(message, args));
         }
         public LogLevel Level {
-            get => LogLevel.Info;
+            get => Mod.IsDebugEnabled() ? LogLevel.Trace : LogLevel.Info;
             set {}
         }
     }
