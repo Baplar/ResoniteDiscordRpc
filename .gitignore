@@ -399,3 +399,6 @@ FodyWeavers.xsd
 
 # Dist folder
 dist/
+
+# Manually downloaded libs
+ResoniteDiscordRpc/lib/

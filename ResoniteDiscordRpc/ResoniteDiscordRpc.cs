@@ -3,11 +3,12 @@ using HarmonyLib;
 using ResoniteModLoader;
 using FrooxEngine.Interfacing;
 using System.Linq;
+using System.Collections.Generic;
 
 namespace ResoniteDiscordRpc;
 
 public class Mod : ResoniteMod {
-	internal const string VERSION_CONSTANT = "1.0.2";
+	internal const string VERSION_CONSTANT = "1.0.3";
 	public override string Name => "ResoniteDiscordRpc";
 	public override string Author => "Baplar";
 	public override string Version => VERSION_CONSTANT;
@@ -22,15 +23,22 @@ public class Mod : ResoniteMod {
 		Config.Save(true);
 
 		Engine.Current.OnReady += () => {
-			Msg("Disposing of existing Discord connector");
 			PlatformInterface platformInterface = Engine.Current.PlatformInterface;
-			platformInterface.GetConnectors<DiscordConnector>().ForEach(connector => connector.Dispose());
+			var existingConnectors = connectorsField(platformInterface);
+
+			List<DiscordConnector> connectorsToDispose = platformInterface.GetConnectors<DiscordConnector>();
+			if (connectorsToDispose.Count > 0) {
+				Msg($"Disposing of {connectorsToDispose.Count} existing Discord connector(s)");
+				connectorsToDispose.ForEach(connector => connector.Dispose());
+				existingConnectors = existingConnectors.Except(connectorsToDispose).ToArray();
+				connectorsField(platformInterface) = existingConnectors;
+			}
 
 			Msg("Initializing Discord RPC connector");
 			IPlatformConnector connector = new DiscordRpcConnector();
 			if (connector.Initialize(platformInterface).Result) {
-				var existingConnectors = connectorsField(platformInterface);
-				connectorsField(platformInterface) = existingConnectors.AddItem(connector).ToArray();
+				existingConnectors = existingConnectors.AddItem(connector).ToArray();
+				connectorsField(platformInterface) = existingConnectors;
 				Msg("Discord RPC connector initialized successfully");
 			}
 		};

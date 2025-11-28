@@ -3,7 +3,7 @@
 		<RootNamespace>ResoniteDiscordRpc</RootNamespace>
 		<AssemblyName>ResoniteDiscordRpc</AssemblyName>
 		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-		<TargetFramework>net9</TargetFramework>
+		<TargetFramework>net10.0</TargetFramework>
 		<LangVersion>12.0</LangVersion>
 		<Deterministic>true</Deterministic>
 		<!-- Change CopyToMods to true if you'd like builds to be moved into the Mods folder automatically-->
@@ -19,8 +19,21 @@
 		<ResonitePath Condition="Exists('$(HOME)/.steam/steam/steamapps/common/Resonite/')">$(HOME)/.steam/steam/steamapps/common/Resonite/</ResonitePath>
 	</PropertyGroup>
 
+    <Target Name="DownloadDiscordRPC" BeforeTargets="ResolveAssemblyReferences">
+        <DownloadFile
+            SourceUrl="https://github.com/Lachee/discord-rpc-csharp/releases/download/v1.6.2/net9.0-dll.zip"
+            DestinationFolder="$(MSBuildProjectDirectory)\lib" />
+		<Unzip
+			SourceFiles="$(MSBuildProjectDirectory)\lib\net9.0-dll.zip"
+			DestinationFolder="$(MSBuildProjectDirectory)\lib\DiscordRPC" />
+    </Target>
+
 	<ItemGroup>
-      <PackageReference Include="DiscordRichPresence" Version="1.6.1.70" />
+      <!--<PackageReference Include="DiscordRichPresence" Version="1.6.1.70" GeneratePathProperty="true" />-->
+		<Reference Include="DiscordRichPresence">
+			<HintPath>$(MSBuildProjectDirectory)\lib\DiscordRPC\DiscordRPC.dll</HintPath>
+			<Private>False</Private>
+		</Reference>
     </ItemGroup>
 
 
@@ -62,5 +75,7 @@
 	<Target Name="PostBuild" AfterTargets="PostBuildEvent" Condition="'$(CopyToMods)'=='true'">
 		<Message Text="Attempting to copy $(TargetFileName) to $(ResonitePath)rml_mods" Importance="high" />
 		<Copy SourceFiles="$(TargetDir)$(TargetFileName)" DestinationFolder="$(ResonitePath)rml_mods" ContinueOnError="true" />
+		<!-- <Copy SourceFiles="$(PkgDiscordRichPresence)/lib/net9.0/DiscordRPC.dll" DestinationFolder="$(ResonitePath)rml_libs" ContinueOnError="true" /> -->
+		<Copy SourceFiles="$(MSBuildProjectDirectory)\lib\DiscordRPC\DiscordRPC.dll" DestinationFolder="$(ResonitePath)rml_libs" ContinueOnError="true" />
 	</Target>
 </Project>
