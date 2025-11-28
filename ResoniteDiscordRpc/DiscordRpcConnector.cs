@@ -121,7 +121,7 @@ namespace FrooxEngine.Interfacing {
 
             string sessionInfoUrl = Interface.Engine.PlatformProfile.GetSessionWebUri(world.SessionId).ToString();
 
-            if (Mod.Thumbnail && world.Time.LocalWorldTime >= 60) {
+            if (Mod.Thumbnail && world.Time.LocalWorldTime >= 150) {
                 // The thumbnail takes a while to be initialized
                 presence.Assets = new() {
                     LargeImageKey = $"{sessionInfoUrl}/thumbnail",
