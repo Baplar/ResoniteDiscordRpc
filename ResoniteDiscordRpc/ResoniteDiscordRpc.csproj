@@ -70,6 +70,10 @@
 			<HintPath>$(ResonitePath)SkyFrost.Base.Models.dll</HintPath>
 			<Private>False</Private>
 		</Reference>
+		<Reference Include="Newtonsoft.Json">
+			<HintPath>$(ResonitePath)Newtonsoft.Json.dll</HintPath>
+			<Private>False</Private>
+		</Reference>
 	</ItemGroup>
 
 	<Target Name="PostBuild" AfterTargets="PostBuildEvent" Condition="'$(CopyToMods)'=='true'">

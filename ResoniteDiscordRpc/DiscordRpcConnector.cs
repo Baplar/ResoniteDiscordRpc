@@ -11,6 +11,7 @@ using ResoniteDiscordRpc;
 
 using Elements.Core;
 using System.Collections.Generic;
+using Newtonsoft.Json;
 
 namespace FrooxEngine.Interfacing {
     public class DiscordRpcConnector : IPlatformConnector, IDisposable {
@@ -51,7 +52,7 @@ namespace FrooxEngine.Interfacing {
                 return Task.FromResult(false);
             }
 
-            discord.Update(presence => {
+            UpdatePresence(presence => {
                 presence.Type = ActivityType.Playing;
                 presence.StatusDisplay = StatusDisplayType.Name;
                 presence.Assets = new() {
@@ -83,9 +84,9 @@ namespace FrooxEngine.Interfacing {
         public void SetCurrentStatus(World world, bool isPrivate, int totalWorldCount) {
             if (Initialized && IsRichPresenceEnabled) {
                 if (isPrivate || RichPresencePreference < RichPresenceLevel.Full) {
-                    discord.Update(presence => SetPrivateActivity(presence, world));
+                    UpdatePresence(presence => SetPrivateActivity(presence, world));
                 } else {
-                    discord.Update(presence => SetPublicActivity(presence, world));
+                    UpdatePresence(presence => SetPublicActivity(presence, world));
                 }
             }
         }
@@ -154,7 +155,7 @@ namespace FrooxEngine.Interfacing {
 
         private void SetBlankActivity() {
             if (Initialized) {
-                discord.Update(presence => {
+                UpdatePresence(presence => {
                     presence.Timestamps = null;
                     presence.State = null;
                     presence.Assets = new() {
@@ -164,6 +165,13 @@ namespace FrooxEngine.Interfacing {
                     presence.Party = null;
                     presence.Buttons = null;
                 });
+            }
+        }
+
+        private void UpdatePresence(Action<RichPresence> action) {
+            var response = discord.Update(action);
+            if (Mod.IsDebugEnabled()) {
+                Mod.Debug($"Updated Discord presence: {JsonConvert.SerializeObject(response)}");
             }
         }
 
@@ -202,7 +210,7 @@ namespace FrooxEngine.Interfacing {
         }
         public LogLevel Level {
             get => Mod.IsDebugEnabled() ? LogLevel.Trace : LogLevel.Info;
-            set {}
+            set { }
         }
     }
 }
