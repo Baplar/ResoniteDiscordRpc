@@ -43,13 +43,28 @@ namespace FrooxEngine.Interfacing {
 
         public Task<bool> Initialize(PlatformInterface platformInterface) {
             Interface = platformInterface;
+            Initialized = true;
+            ShouldUpdate = true;
+            Mod.Msg("Discord connector initialized.");
+            Settings.RegisterValueChanges<DiscordIntegrationSettings>(OnRichPresenceSettingsChanged);
+            return Task.FromResult(true);
+        }
+
+        private void InitClient() {
+            if (discord != null) {
+                // Already initialized
+                return;
+            }
+
+            Mod.Msg("Launching Discord RPC Client");
             discord = new DiscordRpcClient(Interface.Engine.PlatformProfile.DiscordAppId.ToString());
             discord.Logger = new DiscordRpcLogger();
             discord.OnReady += UserCallback;
             if (!discord.Initialize()) {
-                Mod.Error("Could not initialize Discord RPC connector");
+                Mod.Error("Could not initialize Discord RPC client");
                 discord.Dispose();
-                return Task.FromResult(false);
+                discord = null;
+                return;
             }
 
             UpdatePresence(presence => {
@@ -59,26 +74,25 @@ namespace FrooxEngine.Interfacing {
                     LargeImageKey = LARGE_IMAGE_ID,
                 };
             });
-
-            Initialized = true;
-            ShouldUpdate = true;
-            Mod.Msg("Discord connector initialized.");
-            Settings.RegisterValueChanges<DiscordIntegrationSettings>(OnRichPresenceSettingsChanged);
-            return Task.FromResult(true);
         }
 
         private void OnRichPresenceSettingsChanged(DiscordIntegrationSettings setting) {
-            if (setting.RichPresence.Value < RichPresenceLevel.Basic) {
-                ClearCurrentStatus();
+            if (setting.RichPresence.Value > RichPresenceLevel.None && discord == null) {
+                InitClient();
             }
-
+            if (setting.RichPresence.Value == RichPresenceLevel.None && discord != null) {
+                Mod.Msg("Stopping Discord RPC Client");
+                ClearCurrentStatus();
+                discord.Dispose();
+                discord = null;
+            }
             RichPresencePreference = setting.RichPresence.Value;
         }
 
         public void Update() { }
 
         public void Dispose() {
-            discord.Dispose();
+            discord?.Dispose();
         }
 
         public void SetCurrentStatus(World world, bool isPrivate, int totalWorldCount) {
@@ -169,9 +183,11 @@ namespace FrooxEngine.Interfacing {
         }
 
         private void UpdatePresence(Action<RichPresence> action) {
-            var response = discord.Update(action);
-            if (Mod.IsDebugEnabled()) {
-                Mod.Debug($"Updated Discord presence: {JsonConvert.SerializeObject(response)}");
+            if (discord != null) {
+                var response = discord.Update(action);
+                if (Mod.IsDebugEnabled()) {
+                    Mod.Debug($"Updated Discord presence: {JsonConvert.SerializeObject(response)}");
+                }
             }
         }
 

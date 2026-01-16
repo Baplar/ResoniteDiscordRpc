@@ -4,17 +4,21 @@ using ResoniteModLoader;
 using FrooxEngine.Interfacing;
 using System.Linq;
 using System.Collections.Generic;
+using System.Reflection;
 
 namespace ResoniteDiscordRpc;
 
 public class Mod : ResoniteMod {
-	internal const string VERSION_CONSTANT = "1.0.3";
+	internal const string VERSION_CONSTANT = "1.0.4";
 	public override string Name => "ResoniteDiscordRpc";
 	public override string Author => "Baplar";
 	public override string Version => VERSION_CONSTANT;
 	public override string Link => "https://github.com/Baplar/ResoniteDiscordRpc";
 
-	private static readonly AccessTools.FieldRef<PlatformInterface, IPlatformConnector[]> connectorsField = AccessTools.FieldRefAccess<PlatformInterface, IPlatformConnector[]>("connectors");
+	private static readonly AccessTools.FieldRef<PlatformInterface, IPlatformConnector[]> connectorsField =
+		AccessTools.FieldRefAccess<PlatformInterface, IPlatformConnector[]>("connectors");
+	private static readonly MethodInfo shouldInitializePlatformInterface =
+		AccessTools.Method(typeof(PlatformInterface), "ShouldInitializePlatformInterface", [typeof(string), typeof(SkyFrost.Base.AppConfig)]);
 
 	private static ModConfiguration Config;
 
@@ -24,6 +28,11 @@ public class Mod : ResoniteMod {
 
 		Engine.Current.OnReady += () => {
 			PlatformInterface platformInterface = Engine.Current.PlatformInterface;
+			if (!(bool)shouldInitializePlatformInterface.Invoke(platformInterface, ["Discord", Engine.Config])) {
+				Msg("Skipping initialization of Discord RPC connector");
+				return;
+			}
+
 			var existingConnectors = connectorsField(platformInterface);
 
 			List<DiscordConnector> connectorsToDispose = platformInterface.GetConnectors<DiscordConnector>();
